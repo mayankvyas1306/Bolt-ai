@@ -1,0 +1,18 @@
+1.Firstly we are bulilding the home page and for the backgrounds , icons and verious other functionality we will be using ui shadcn
+
+In ui shadcn we have to install the functionality we want to use and then only we can use and all the installed materials will be stored in forlder components/ui, after running command for shadcn one folder lib will be created
+
+In app folder we had created the provider.jsx file which includes all the headers and etc
+whatever stuffs we want throughout our application we will use it in layout.js
+In folder data we will be use colors.jsx,lookup.jsx and prompt.jsx 
+In components folder and inside it we will have custom folder which contains headers and hero.jsx
+
+We will be completing our header.jsx
+Now we come to Hero.jsx  
+making context folder inside messagesContext and inorder to use it we will wrap our content of provider.jsx inside it
+Now we will be adding authentications - For that we will be adding new file inside context folder and create new file userDetailContext =>
+to add authorizaton we will be taking shadcn for dialog box 
+for these we had learned the new thing called dialog distruction in which we will pass a item like ' const SigninDialog = ({ openDialog }) => ' instead of 'const SigninDialog = ( openDialog ) => '
+because on adding curly braces we have object destructuring to pull the openDialog value out of the props object.
+Now we will add sign in with google functionality
+So for that we will be using react oauth google we will install it
