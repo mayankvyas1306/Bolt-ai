@@ -13,6 +13,7 @@ import Prompt from "@/data/Prompt";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { useSidebar } from "../ui/sidebar";
+import remarkGfm from 'remark-gfm';
 
 const ChatView = () => {
   const { id } = useParams();
@@ -141,7 +142,11 @@ const ChatView = () => {
               </div>
             )}
             <div className="flex-1">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                a:({node, ...props})=>null,
+                script:()=>null,
+                iframe: ()=>null,
+              }}>{msg.content}</ReactMarkdown>
             </div>
           </div>
         ))}

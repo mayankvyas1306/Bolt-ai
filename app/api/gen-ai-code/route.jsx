@@ -8,6 +8,10 @@ export async function POST(req){
         const resp=(await result).response.text();
         return NextResponse.json(JSON.parse(resp));
     }catch(e){
-        return NextResponse.json({error:resp});
+        console.error("Code generation error:",e);
+        return NextResponse.json(
+            {error:"Code generation failed"},
+            {status:500}
+        );
     }
 }

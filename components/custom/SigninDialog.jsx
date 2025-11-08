@@ -46,7 +46,7 @@ const SigninDialog = ({ openDialog, closeDialog }) => {
             console.error("Convex Mutation Failed:", convexError);
             // We proceed, but the database didn't get the user.
         }
-        
+        /*
         // 2. --- LOCAL STORAGE (Ensures execution even if Convex failed) ---
         // ✅ Corrected typo and ensured execution
         if (typeof window !== 'undefined') {
@@ -54,6 +54,12 @@ const SigninDialog = ({ openDialog, closeDialog }) => {
             localStorage.setItem('user', JSON.stringify(user)); 
             console.log("User stored in localStorage.");
         }
+            */
+        await fetch('/api/auth/session',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({user})
+        });
 
         // 3. --- UI UPDATE ---
         setUserDetail(userInfo?.data);
