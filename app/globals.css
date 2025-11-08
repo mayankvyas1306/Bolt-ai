@@ -130,3 +130,20 @@
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
 }
+
+.arrow-btn {
+  background-color: #0f5132; /* dark green current */
+  color: white;
+  transition: background-color 0.18s ease, transform 0.12s ease;
+  border-radius: 8px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrow-btn:hover,
+.arrow-btn:focus {
+  background-color: #2563eb; /* new color on hover (blue) — change as you like */
+  transform: translateY(-2px);
+}

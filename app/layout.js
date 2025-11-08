@@ -1,7 +1,7 @@
 import "./globals.css";
 import Provider from "./provider";
 import ConvexClientProvider from "./ConvexClientProvider";
-
+import ErrorBoundary from "@/components/ErrorBoundary";
 export const metadata = {
   title: "Bolt AI",
   description: "Transform Idea into code",
