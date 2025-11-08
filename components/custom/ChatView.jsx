@@ -1,7 +1,7 @@
 "use client";
 import React, { useContext, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useConvex, useMutation } from "convex/react";
+import { useQuery, useConvex, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { MessagesContext } from "@/context/MessagesContext";
 import Colors from "@/data/Colors";
@@ -13,7 +13,7 @@ import Prompt from "@/data/Prompt";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { useSidebar } from "../ui/sidebar";
-import remarkGfm from 'remark-gfm';
+import remarkGfm from "remark-gfm";
 
 const ChatView = () => {
   const { id } = useParams();
@@ -24,6 +24,16 @@ const ChatView = () => {
   const [loading, setLoading] = useState(false);
   const UpdateMessages = useMutation(api.workspace.UpdateWorkspace);
   const { toggleSidebar } = useSidebar();
+
+  const workspaceData = useQuery(
+    api.workspace.GetWorkspace,
+    id ? { workspaceId: id } : "skip"
+  );
+  useEffect(() => {
+    if (workspaceData?.messages) {
+      setMessages(workspaceData.messages);
+    }
+  }, [workspaceData]);
 
   useEffect(() => {
     if (id) {
@@ -60,43 +70,34 @@ const ChatView = () => {
     setLoading(true);
 
     try {
-      const PROMPT = JSON.stringify(messages) + Prompt.CHAT_PROMPT;
-      console.log("📤 Sending prompt to AI");
+       const PROMPT = JSON.stringify(messages) + Prompt.CHAT_PROMPT;
+    console.log("📤 Sending prompt to AI:", PROMPT);
 
-      const result = await axios.post("/api/ai-chat", {
-        prompt: PROMPT,
-      });
-
-      console.log("📥 AI Response received:", result.data);
-
-      if (!result.data.result) {
-        throw new Error("No response from AI");
+      const result = await axios.post("/api/ai-chat", { prompt: PROMPT });
+      // Normal success path
+      if (result.status === 200 && result.data?.result) {
+        const aiResp = { role: "ai", content: result.data.result };
+        const updatedMessages = [...messages, aiResp];
+        setMessages(updatedMessages);
+        await UpdateMessages({ messages: updatedMessages, workspaceId: id });
+      } else {
+        // Handle 200 with unexpected payload or other 2xx shape
+        console.warn("ai-chat unexpected response:", result);
+        setMessages((prev) => [
+          ...prev,
+          { role: "ai", content: "AI returned an unexpected response." },
+        ]);
       }
-
-      const aiResp = {
-        role: "ai",
-        content: result.data.result,
-      };
-
-      // Update messages state
-      const updatedMessages = [...messages, aiResp];
-      setMessages(updatedMessages);
-
-      // Update in database
-      await UpdateMessages({
-        messages: updatedMessages,
-        workspaceId: id,
-      });
-
-      console.log("✅ AI response added successfully");
-    } catch (error) {
-      console.error("❌ Error getting AI response:", error);
-      // Show error to user
-      const errorResp = {
-        role: "ai",
-        content: "Sorry, I encountered an error. Please try again.",
-      };
-      setMessages((prev) => [...prev, errorResp]);
+    } catch (err) {
+      console.error("Error calling /api/ai-chat:", err?.response ?? err);
+      const message =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        "Server error while generating response.";
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: `Sorry — ${message}` },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -142,11 +143,16 @@ const ChatView = () => {
               </div>
             )}
             <div className="flex-1">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                a:({node, ...props})=>null,
-                script:()=>null,
-                iframe: ()=>null,
-              }}>{msg.content}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ node, ...props }) => null,
+                  script: () => null,
+                  iframe: () => null,
+                }}
+              >
+                {msg.content}
+              </ReactMarkdown>
             </div>
           </div>
         ))}
@@ -165,7 +171,7 @@ const ChatView = () => {
 
       {/* Input Section */}
       <div className="flex gap-2 items-end">
-        {userDetail && 
+        {userDetail && (
           <Image
             onClick={toggleSidebar}
             src={userDetail?.picture}
@@ -174,36 +180,41 @@ const ChatView = () => {
             width={30}
             height={30}
           />
-        }
-      <div className="p-5 border rounded-xl max-w-xl w-full mt-3" style=
-        {{
-          backgroundColor: Colors.BACKGROUND,
-        }}>
-        <div className="flex gap-2">
-          <textarea
-            placeholder={Lookup.INPUT_PLACEHOLDER}
-            className="outline-none bg-transparent w-full h-32 max-h-30 resize-none"
-            value={userInput}
-            onChange={(event) => setUserInput(event.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onGenerate(userInput);
-              }
-            }}
-          />
-          {userInput && (
-            <ArrowRight
-              onClick={() => onGenerate(userInput)}
-              className="bg-green-700 p-2 h-9 w-8 rounded-md cursor-pointer flex-none"
+        )}
+        <div
+          className="p-5 border rounded-xl max-w-xl w-full mt-3"
+          style={{
+            backgroundColor: Colors.BACKGROUND,
+          }}
+        >
+          <div className="flex gap-2">
+            <textarea
+              placeholder={Lookup.INPUT_PLACEHOLDER}
+              className="outline-none bg-transparent w-full h-32 max-h-30 resize-none"
+              value={userInput}
+              onChange={(event) => setUserInput(event.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onGenerate(userInput);
+                }
+              }}
             />
-          )}
-        </div>
-        <div>
-          <Link className="h-5 w-5" />
+            {userInput && (
+              <button
+                onClick={() => onGenerate(userInput)}
+                className="bg-green-700 p-2 h-9 w-8 rounded-md cursor-pointer flex-none transition-all duration-200 hover:bg-blue-500 hover:scale-110 hover:shadow-lg active:scale-95"
+                aria-label="Send message"
+              >
+                <ArrowRight className="h-5 w-5 text-white" />
+              </button>
+            )}
+          </div>
+          <div>
+            <Link className="h-5 w-5" />
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 };
