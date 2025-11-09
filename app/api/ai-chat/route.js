@@ -1,37 +1,74 @@
 // app/api/ai-chat/route.js
 import { NextResponse } from "next/server";
 import { chatSession } from "@/configs/AiModel";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
 
 export async function POST(req) {
-  // try to get session, but don't fail hard if absent (dev fallback)
-  let session = null;
   try {
-    session = await getServerSession(authOptions);
-  } catch (e) {
-    console.warn("ai-chat: getServerSession error (continuing anonymously):", e);
-    session = null;
-  }
+    console.log("🔵 AI Chat route called");
+    
+    const body = await req.json();
+    const { prompt } = body;
+    
+    if (!prompt) {
+      console.error("❌ No prompt provided");
+      return NextResponse.json(
+        { error: "Prompt required" }, 
+        { status: 400 }
+      );
+    }
 
-  // If you want to force auth in production, replace the following block with a 401 return
-  // if (!session) { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
+    console.log("📝 Prompt length:", prompt.length);
 
-  const { prompt } = await req.json();
-  if (!prompt) {
-    return NextResponse.json({ error: "Prompt required" }, { status: 400 });
-  }
+    // Check if chatSession is available
+    if (!chatSession) {
+      console.error("❌ AI service not configured - chatSession is null");
+      return NextResponse.json(
+        { 
+          error: "AI service not configured", 
+          detail: "NEXT_PUBLIC_GEMINI_API_KEY is missing or invalid. Please check your environment variables." 
+        }, 
+        { status: 500 }
+      );
+    }
 
-  try {
-    // Provide some metadata when anonymous so you can track usage
-    const meta = session ? { user: session.user } : { anonymous: true };
-    // Make sure to await the AI client call
-    const result = await chatSession.sendMessage(prompt);
+    console.log("✅ ChatSession available, sending message...");
+
+    // Send message to AI with timeout
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), 30000)
+    );
+
+    const aiPromise = chatSession.sendMessage(prompt);
+
+    const result = await Promise.race([aiPromise, timeoutPromise]);
+    
+    if (!result?.response) {
+      console.error("❌ No response from AI");
+      return NextResponse.json(
+        { error: "No response from AI service" },
+        { status: 500 }
+      );
+    }
+
     const AIResp = await result.response.text();
+    console.log("✅ AI response received, length:", AIResp.length);
 
     return NextResponse.json({ result: AIResp });
-  } catch (e) {
-    console.error("AI Error (ai-chat):", e);
-    return NextResponse.json({ error: "Failed to generate response", detail: e.message }, { status: 500 });
+    
+  } catch (error) {
+    console.error("❌ AI Error (ai-chat):", error);
+    console.error("Error details:", {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    });
+    
+    return NextResponse.json(
+      { 
+        error: "Failed to generate response", 
+        detail: error?.message || "An unknown error occurred. Check server logs." 
+      }, 
+      { status: 500 }
+    );
   }
 }
