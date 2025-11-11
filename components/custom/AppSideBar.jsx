@@ -36,7 +36,7 @@ const AppSideBar = () => {
 
   const handleHelp = () => {
     console.log("Help clicked");
-    if (typeof window !== "undefined") window.open("https://docs.example.com", "_blank");
+    if (typeof window !== "undefined") window.open("https://docs.boltai.com/docs", "_blank");
   };
 
   const handleSignOut = () => {

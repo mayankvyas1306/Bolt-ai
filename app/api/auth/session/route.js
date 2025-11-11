@@ -5,8 +5,11 @@ import { cookies } from "next/headers";
 export async function POST(req) {
   const { user } = await req.json();
   
-  // Set HTTP-only cookie (not accessible via JavaScript)
-  cookies().set('session', JSON.stringify(user), {
+  // Fix: Call cookies() and assign it to a variable first.
+  const cookieStore = cookies();
+
+  // Use the variable to set the cookie
+  cookieStore.set('session', JSON.stringify(user), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -18,7 +21,11 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
-  const session = cookies().get('session');
+  // Fix: Call cookies() and assign it to a variable first.
+  const cookieStore = cookies();
+  
+  // Use the variable to get the cookie
+  const session = cookieStore.get('session');
   
   if (!session) {
     return NextResponse.json({ user: null });
