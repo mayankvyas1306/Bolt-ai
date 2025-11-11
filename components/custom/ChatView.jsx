@@ -59,33 +59,58 @@ const ChatView = () => {
     }
   };
 
+  // prevent concurrent calls
+  const isFetchingRef = useRef(false);
+
   useEffect(() => {
     if (messages?.length > 0) {
       const lastMessage = messages[messages.length - 1];
       console.log("Last message:", lastMessage);
-      if (lastMessage.role === "user") {
+      if (lastMessage.role === "user" && !isFetchingRef.current) {
         GetAiResponse();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
+
+  // Build trimmed prompt from last N messages
+  const buildTrimmedPrompt = (msgs, maxMessages = 6) => {
+    const slice = Array.isArray(msgs) ? msgs.slice(-maxMessages) : [];
+    return slice.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
+  };
 
   // Get AI response
   const GetAiResponse = async () => {
-    console.log("🔵 Getting AI Response...");
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setLoading(true);
 
     try {
-      const PROMPT = JSON.stringify(messages) + Prompt.CHAT_PROMPT;
-      console.log("📤 Sending prompt to AI:", PROMPT.substring(0, 100) + "...");
+      // Trim messages to last 6 to limit token usage
+      const trimmedMsgs = messages?.slice(-6) || [];
+      const PROMPT_BODY = buildTrimmedPrompt(trimmedMsgs, 6) + "\n\n" + Prompt.CHAT_PROMPT;
+      console.log("📤 Sending trimmed prompt to AI:", PROMPT_BODY.substring(0, 300) + "...");
 
-      const result = await axios.post("/api/ai-chat", { prompt: PROMPT });
-      
+      const result = await axios.post("/api/ai-chat", { prompt: PROMPT_BODY, messages: trimmedMsgs });
+
       if (result.status === 200 && result.data?.result) {
         const aiResp = { role: "ai", content: result.data.result };
         const updatedMessages = [...messages, aiResp];
         setMessages(updatedMessages);
-        await UpdateMessages({ messages: updatedMessages, workspaceId: id });
+        try {
+          await UpdateMessages({ messages: updatedMessages, workspaceId: id });
+        } catch (updErr) {
+          console.warn("Failed to persist messages to Convex:", updErr);
+        }
         toast.success("AI responded!");
+      } else if (result.data?.error) {
+        // server returned structured error
+        const errMsg = result.data.error;
+        toast.error(errMsg);
+        setMessages((prev) => [
+          ...prev,
+          { role: "ai", content: `Sorry, I encountered an error: ${errMsg}` },
+        ]);
       } else {
         console.warn("ai-chat unexpected response:", result);
         toast.error("Unexpected AI response");
@@ -95,24 +120,28 @@ const ChatView = () => {
         ]);
       }
     } catch (err) {
-      console.error("❌ Error calling /api/ai-chat:", err);
-      
+      console.error("❌ Error calling /api/ai-chat (full):", err);
+
+      // derive a user-friendly message
       let errorMessage = "Failed to get AI response";
-      
-      if (err?.response) {
-        errorMessage = err.response.data?.error || err.response.data?.detail || errorMessage;
+
+      if (err?.response?.data) {
+        // server returned structured JSON (our server routes do)
+        const data = err.response.data;
+        errorMessage = data.error || data.result || JSON.stringify(data.providerError) || errorMessage;
       } else if (err?.message) {
         errorMessage = err.message;
       }
-      
+
       toast.error(errorMessage);
-      
+
       setMessages((prev) => [
         ...prev,
         { role: "ai", content: `Sorry, I encountered an error: ${errorMessage}` },
       ]);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -123,12 +152,12 @@ const ChatView = () => {
     }
 
     console.log("💬 User input:", input);
-    
+
     let content = input;
     if (attachedFiles.length > 0) {
       content += "\n\nAttached files: " + attachedFiles.map(f => f.name).join(", ");
     }
-    
+
     setMessages((prev) => [
       ...prev,
       {

@@ -6,7 +6,7 @@ export async function POST(req) {
   const { user } = await req.json();
   
   // Fix: Call cookies() and assign it to a variable first.
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   // Use the variable to set the cookie
   cookieStore.set('session', JSON.stringify(user), {
@@ -22,7 +22,7 @@ export async function POST(req) {
 
 export async function GET(req) {
   // Fix: Call cookies() and assign it to a variable first.
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   
   // Use the variable to get the cookie
   const session = cookieStore.get('session');
